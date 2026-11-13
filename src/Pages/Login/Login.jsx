@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { Box, Button, Link, Paper, TextField, Typography } from "@mui/material";
-import { login } from "../../Services/Auth";
 import toast from "react-hot-toast";
 import { useAuth } from "../../Context/AuthContext";
 
 export const Login = () => {
-    const { login } = useAuth();
     const navigate = useNavigate();
+    const { login } = useAuth();
+
     const [form, setForm] = useState({ email: "", password: "" });
     const [loading, setLoading] = useState(false);
 
@@ -21,10 +21,10 @@ export const Login = () => {
 
         setLoading(true);
         try {
-            await login(form.email.trim(), form.password);
-            navigate("/friends");
+        await login(form.email.trim(), form.password);
+        navigate("/friends");
         } catch (err) {
-            toast.error(err.message);
+        toast.error(err.message);
         } finally {
         setLoading(false);
         }

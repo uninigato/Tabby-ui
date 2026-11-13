@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { HubConnectionBuilder } from "@microsoft/signalr";
+import { HubConnectionBuilder, HttpTransportType } from "@microsoft/signalr";
 import { getToken } from "../Services/Client";
 import { useAuth } from "./AuthContext";
 
@@ -13,9 +13,11 @@ export function RealtimeProvider({ children }) {
     if (!user) return; // not logged in, nothing to connect
 
     const conn = new HubConnectionBuilder()
-      .withUrl(`${import.meta.env.VITE_API_URL}/hubs/chat`, {
-        accessTokenFactory: () => getToken() ?? "",
-      })
+        .withUrl(`${import.meta.env.VITE_API_URL}/hubs/chat`, {
+          accessTokenFactory: () => getToken() ?? "",
+          skipNegotiation: true,
+          transport: HttpTransportType.WebSockets,
+        })
       .withAutomaticReconnect()
       .build();
 
