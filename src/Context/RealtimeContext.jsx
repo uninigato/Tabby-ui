@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { HubConnectionBuilder, HttpTransportType } from "@microsoft/signalr";
+import { HttpTransportType, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { getToken } from "../Services/Client";
 import { useAuth } from "./AuthContext";
 
@@ -13,24 +13,38 @@ export function RealtimeProvider({ children }) {
     if (!user) return; // not logged in, nothing to connect
 
     const conn = new HubConnectionBuilder()
-        .withUrl(`${import.meta.env.VITE_API_URL}/hubs/chat`, {
-          accessTokenFactory: () => getToken() ?? "",
-          skipNegotiation: true,
-          transport: HttpTransportType.WebSockets,
-        })
-      .withAutomaticReconnect()
+      .withUrl(`${import.meta.env.VITE_API_URL}/hubs/chat`, {
+        accessTokenFactory: () => getToken() ?? "",
+        skipNegotiation: true,
+        transport: HttpTransportType.WebSockets,
+      })
+      // The default policy gives up after about 40 seconds. This one retries forever.
+      .withAutomaticReconnect({
+        nextRetryDelayInMilliseconds: (ctx) => Math.min(1000 * (ctx.previousRetryCount + 1), 10000),
+      })
+      .configureLogging(LogLevel.Information)
       .build();
+
+    // A background tab can fall behind on its timers, so give the server more time to answer
+    conn.serverTimeoutInMilliseconds = 120000;
 
     let cancelled = false;
 
-    conn
-      .start()
-      .then(() => {
-        if (!cancelled) setConnection(conn);
-      })
-      .catch((err) => {
-        if (!cancelled) console.error("SignalR connection failed:", err);
-      });
+    // The automatic reconnect only covers a connection that dropped after it opened,
+    // so if the very first start fails (the API is still booting), retry it here
+    const startWithRetry = async () => {
+      while (!cancelled) {
+        try {
+          await conn.start();
+          if (!cancelled) setConnection(conn);
+          return;
+        } catch (err) {
+          console.error("SignalR start failed, retrying:", err);
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+      }
+    };
+    startWithRetry();
 
     return () => {
       cancelled = true;
